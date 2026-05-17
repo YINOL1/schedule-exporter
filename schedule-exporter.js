@@ -16,4 +16,22 @@
         return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}T${String(hour).padStart(2, '0')}${minute.padStart(2, '0')}00`;
     }
 
+    // Paste and Slice into Lines
+    const rawInput = prompt("Copy and Paste the entire 'List View' page under 'Class Schedule' in Quest here:");
+    if (!rawInput) {
+        alert("No text detected. Exiting program.");
+        return;
+    }
+
+    const lines = rawInput.split('\n');
+
+    // Initiate .ics Content
+    let icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Quest Schedule Exporter//EN",
+        "CALSCALE:GREGORIAN"
+    ];
+
+    let currentCourseTitle = "Unknown";
 })();
