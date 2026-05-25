@@ -63,7 +63,53 @@
         else if(/\d{4}\/\d{2}\/\d{2} - \d{4}\/\d{2}\/\d{2}/.test(trimmedLine)) {
             const dates = trimmedLine;
             if (currentTime.includes("TBA") || dates.includes("TBA")) return;
-        }
-    })
 
+            //Insert Schedule in .ics File
+            const timeParts = currentTime.split(' ');
+            const daysString = timeParts[0]; 
+            const timeRange = currentTime.replace(daysString, '').trim();
+            const [startTimeStr, endTimeStr] = timeRange.split(' - ');
+            const [startDateStr, endDateStr] = dates.split(' - ');
+
+            let rruleDays = daysString
+                .replace(/Th/g, "TH,")
+                .replace(/T/g, "TU,")
+                .replace(/W/g, "WE,")
+                .replace(/M/g, "MO,")
+                .replace(/F/g, "FR,");
+
+            if (rruleDays.endsWith(",")) {
+                rruleDays = rruleDays.slice(0, -1);
+            }
+
+            const dtStart = formatDateTime(startDateStr, startTimeStr);
+            const dtEnd = formatDateTime(startDateStr, endTimeStr);
+            const rruleUntil = formatDateTime(endDateStr, "11:59PM");
+
+            const eventBlock = 
+`BEGIN:VEVENT
+SUMMARY:${currentCourseTitle} (${currentComponent})
+LOCATION:${currentRoom}
+DTSTART;TZID=America/Toronto:${dtStart}
+DTEND;TZID=America/Toronto:${dtEnd}
+RRULE:FREQ=WEEKLY;UNTIL=${rruleUntil};BYDAY=${rruleDays}
+END:VEVENT`;
+
+            icsContent.push(eventBlock);
+        }
+    });
+
+    icsContent.push("END:VCALENDAR");
+
+    //Download .ics File
+    const finalICSString = icsContent.join('\n');
+    const blob = new Blob([finalICSString], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Schedule.ics';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 })();
