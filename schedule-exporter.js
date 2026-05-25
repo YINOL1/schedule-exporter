@@ -15,6 +15,8 @@ function generateICS(rawInput) {
 
         return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}T${String(hour).padStart(2, '0')}${minute.padStart(2, '0')}00`;
     }
+    const now = new Date();
+    const dtStamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
     const lines = rawInput.split('\n');
 
@@ -43,17 +45,7 @@ function generateICS(rawInput) {
             return;
         }
 
-        if (trimmedLine.includes(' - ') && !trimmedLine.includes(':') && !trimmedLine.includes('AM') && !trimmedLine.includes('PM')) {
-            currentCourseTitle = trimmedLine.split(' - ')[0].trim();
-        }
-        else if (["LEC", "TUT", "LAB", "TST", "SEM"].includes(trimmedLine)) {
-            currentComponent = trimmedLine;
-        }
-        else if ((trimmedLine.includes('AM') || trimmedLine.includes('PM')) && trimmedLine.includes(':')) {
-            currentTime = trimmedLine;
-            expectRoom = true;
-        }
-        else if(/\d{4}\/\d{2}\/\d{2} - \d{4}\/\d{2}\/\d{2}/.test(trimmedLine)) {
+        if (/\d{4}\/\d{2}\/\d{2} - \d{4}\/\d{2}\/\d{2}/.test(trimmedLine)) {
             const dates = trimmedLine;
             if (currentTime.includes("TBA") || dates.includes("TBA")) return;
 
@@ -65,11 +57,12 @@ function generateICS(rawInput) {
             const [startDateStr, endDateStr] = dates.split(' - ');
 
             let rruleDays = daysString
-                .replace(/Th/g, "TH,")
-                .replace(/T/g, "TU,")
-                .replace(/W/g, "WE,")
-                .replace(/M/g, "MO,")
-                .replace(/F/g, "FR,");
+                .replace(/Th/g, "th,")
+                .replace(/T/g, "tu,")
+                .replace(/W/g, "we,")
+                .replace(/M/g, "mo,")
+                .replace(/F/g, "fr,")
+                .toUpperCase();
 
             if (rruleDays.endsWith(",")) {
                 rruleDays = rruleDays.slice(0, -1);
@@ -77,22 +70,47 @@ function generateICS(rawInput) {
 
             const dtStart = formatDateTime(startDateStr, startTimeStr);
             const dtEnd = formatDateTime(startDateStr, endTimeStr);
-            const rruleUntil = formatDateTime(endDateStr, "11:59PM");
 
-            const eventBlock = 
-`BEGIN:VEVENT
-SUMMARY:${currentCourseTitle} (${currentComponent})
-LOCATION:${currentRoom}
-DTSTART;TZID=America/Toronto:${dtStart}
-DTEND;TZID=America/Toronto:${dtEnd}
-RRULE:FREQ=WEEKLY;UNTIL=${rruleUntil};BYDAY=${rruleDays}
-END:VEVENT`;
+            const [eYear, eMonth, eDay] = endDateStr.split('/');
+            const endObj = new Date(eYear, eMonth - 1, eDay);
+            endObj.setDate(endObj.getDate() + 1);
+            
+            const safeYear = endObj.getFullYear();
+            const safeMonth = String(endObj.getMonth() + 1).padStart(2, '0');
+            const safeDay = String(endObj.getDate()).padStart(2, '0');
+            const rruleUntil = `${safeYear}${safeMonth}${safeDay}T040000Z`;
+
+            const safeTitle = currentCourseTitle.replace(/\s+/g, '');
+            const randomString = Math.random().toString(36).substring(2, 10);
+            const uid = `${dtStart}-${safeTitle}-${randomString}@questexporter.com`;
+
+            const eventBlock = [
+                "BEGIN:VEVENT",
+                `UID:${uid}`,
+                `DTSTAMP:${dtStamp}`,
+                `SUMMARY:${currentCourseTitle} (${currentComponent})`,
+                `LOCATION:${currentRoom}`,
+                `DTSTART;TZID=America/Toronto:${dtStart}`,
+                `DTEND;TZID=America/Toronto:${dtEnd}`,
+                `RRULE:FREQ=WEEKLY;UNTIL=${rruleUntil};BYDAY=${rruleDays}`,
+                "END:VEVENT"
+            ].join('\r\n');
 
             icsContent.push(eventBlock);
+        }
+        else if (trimmedLine.includes(' - ') && !trimmedLine.includes(':') && !trimmedLine.includes('AM') && !trimmedLine.includes('PM')) {
+            currentCourseTitle = trimmedLine.split(' - ')[0].trim();
+        }
+        else if (["LEC", "TUT", "LAB", "TST", "SEM"].includes(trimmedLine)) {
+            currentComponent = trimmedLine;
+        }
+        else if ((trimmedLine.includes('AM') || trimmedLine.includes('PM')) && trimmedLine.includes(':')) {
+            currentTime = trimmedLine;
+            expectRoom = true;
         }
     });
 
     icsContent.push("END:VCALENDAR");
 
-    return icsContent.join('\n');
+    return icsContent.join('\r\n');
 }
